@@ -1,10 +1,11 @@
 from fastapi import FastAPI, Depends
 from sqlalchemy.orm import Session
-from starlette.responses import JSONResponse
+from starlette import status
 
-from api.api import add_user, get_all
-from api.database import Base, engine, SessionLocal, Person
-from api.user import User
+from api.api import add_user, get_all, get_id, update_partial
+from api.database import Base, engine, SessionLocal
+from api.user import StaffBase, StaffUpdatePartial
+from fastapitest.api import api
 
 # создаем таблицы
 Base.metadata.create_all(bind=engine)
@@ -20,14 +21,8 @@ def get_db():
         db.close()
 
 
-@api_app.post("/test", response_model=User)
-def main(user: User):
-    # сохранить в базу user
-    return user
-
-
-@api_app.post("/api/users/add", response_model=User)
-def add_an_employee(body: User, db: Session = Depends(get_db)) -> Person:
+@api_app.post("/api/users/add", response_model=StaffBase, status_code=status.HTTP_201_CREATED)
+def add_an_employee(body: StaffBase, db: Session = Depends(get_db)):
     return add_user(body, db)
 
 
@@ -36,74 +31,16 @@ def entire_staff_list(db: Session = Depends(get_db)):
     return get_all(db)
 
 
-@api_app.get("/api/users/{id}")
-def employee_by_id(id, db: Session = Depends(get_db)):
-    """Сотрудник по id"""
-    # получаем пользователя по id
-    person = db.query(Person).filter(Person.id == id).first()
-    # если не найден, отправляем статусный код и сообщение об ошибке
-    if person == None:
-        return JSONResponse(status_code=404, content={"message": "Пользователь не найден"})
-    # если пользователь найден, отправляем его
-    return person
+@api_app.get("/api/users/{employee_id}")
+def employee_by_id(employee_id, db: Session = Depends(get_db)):
+    return get_id(employee_id, db)
 
 
-@api_app.put("/api/surname/{id}/{surname}")
-def edit_surname(id, surname, db: Session = Depends(get_db)):
-    """меняем фамилию"""
-    # получаем пользователя по id
-    person = db.query(Person).filter(Person.id == id).first()
-    # если не найден, отправляем статусный код и сообщение об ошибке
-    if person == None:
-        return JSONResponse(status_code=404, content={"message": "Пользователь не найден"})
-    # если пользователь найден, изменяем его данные и отправляем обратно клиенту
-    person.surname = surname
-    db.commit()  # сохраняем изменения
-    db.refresh(person)
-    return person
+@api_app.patch("/api/user/{employee_id}", response_model=StaffBase)
+def update_by_id(employee_id, body_update: StaffUpdatePartial, db: Session = Depends(get_db)):
+    return update_partial(employee_id, body_update, db)
 
 
-@api_app.put("/api/name/{id}/{name}")
-def edit_name(id, name, db: Session = Depends(get_db)):
-    """меняем имя"""
-    # получаем пользователя по id
-    person = db.query(Person).filter(Person.id == id).first()
-    # если не найден, отправляем статусный код и сообщение об ошибке
-    if person == None:
-        return JSONResponse(status_code=404, content={"message": "Пользователь не найден"})
-    # если пользователь найден, изменяем его данные и отправляем обратно клиенту
-    person.name = name
-    db.commit()  # сохраняем изменения
-    db.refresh(person)
-    return person
-
-
-@api_app.put("/api/salary/{id}/{salary}")
-def edit_salary(id, salary, db: Session = Depends(get_db)):
-    """меняем зарплату"""
-    # получаем пользователя по id
-    person = db.query(Person).filter(Person.id == id).first()
-    # если не найден, отправляем статусный код и сообщение об ошибке
-    if person == None:
-        return JSONResponse(status_code=404, content={"message": "Пользователь не найден"})
-    # если пользователь найден, изменяем его данные и отправляем обратно клиенту
-    person.salary = salary
-    db.commit()  # сохраняем изменения
-    db.refresh(person)
-    return person
-
-
-@api_app.delete("/api/users/{id}")
-def delete_an_employee(id, db: Session = Depends(get_db)):
-    """Удалить сотрудника"""
-    # получаем пользователя по id
-    person = db.query(Person).filter(Person.id == id).first()
-
-    # если не найден, отправляем статусный код и сообщение об ошибке
-    if person == None:
-        return JSONResponse(status_code=404, content={"message": "Пользователь не найден"})
-
-    # если пользователь найден, удаляем его
-    db.delete(person)  # удаляем объект
-    db.commit()  # сохраняем изменения
-    return person
+@api_app.delete("/api/user/{employee_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_employee(employee_id, db: Session = Depends(get_db)):
+    api.delete_employee(employee_id, db)
